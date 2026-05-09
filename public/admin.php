@@ -1,7 +1,7 @@
 <?php
 
-require __DIR__ . '/../lib/bootstrap.php';
-require __DIR__ . '/../lib/layout.php';
+require_once __DIR__ . '/../lib/bootstrap.php';
+require_once __DIR__ . '/../lib/layout.php';
 
 $staff = current_staff();
 $error = null;
@@ -13,14 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($title === '' || $body === '') {
         $error = 'Title and body are required.';
     } else {
+        $slug = generate_document_slug();
         $stmt = db()->prepare('
-            INSERT INTO documents (title, body, created_by)
-            VALUES (?, ?, ?)
+            INSERT INTO documents (title, body, created_by, slug)
+            VALUES (?, ?, ?, ?)
         ');
-        $stmt->execute([$title, $body, $staff['id']]);
+        $stmt->execute([$title, $body, $staff['id'], $slug]);
         $docId = (int) db()->lastInsertId();
 
-        audit_log('create', 'document', $docId, ['title' => $title]);
+        // Slug is recorded in the audit log as a stable internal handle.
+        // It is NOT surfaced in the UI or URLs — see docs/decisions.md.
+        audit_log('create', 'document', $docId, [
+            'title' => $title,
+            'slug' => $slug,
+        ]);
 
         header('Location: /admin.php?created=' . $docId);
         exit;

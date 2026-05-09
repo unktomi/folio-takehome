@@ -1,7 +1,7 @@
 <?php
 
-require __DIR__ . '/../lib/bootstrap.php';
-require __DIR__ . '/../lib/layout.php';
+require_once __DIR__ . '/../lib/bootstrap.php';
+require_once __DIR__ . '/../lib/layout.php';
 
 $staff = current_staff();
 $docId = (int) ($_GET['doc'] ?? 0);
@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $shareId = (int) db()->lastInsertId();
         audit_log('create', 'share', $shareId, [
             'document_id' => $doc['id'],
+            'document_slug' => $doc['slug'],
             'recipient_email' => $email,
         ]);
         $created_token = $token;
@@ -48,7 +49,7 @@ render_header('Share · ' . $doc['title'], $staff);
 
 <a href="/admin.php" class="back-link">← back to admin</a>
 
-<h1 class="page-title">Share "<?= h($doc['title']) ?>"</h1>
+<h1 class="page-title">Share “<?= h($doc['title']) ?>”</h1>
 <p class="page-subtitle">Generate a one-time link for a recipient.</p>
 
 <?php if ($error): ?>

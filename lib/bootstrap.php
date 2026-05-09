@@ -43,6 +43,20 @@ function random_token(int $bytes = 16): string {
     return bin2hex(random_bytes($bytes));
 }
 
+// Internal document handle. Crockford-ish base32 alphabet (no 0/O/1/I/L),
+// 10 chars ≈ 50 bits of entropy. This is NOT a URL component and NOT a
+// user-facing identifier — it's a stable DB handle used for audit log
+// entries and internal references. See docs/decisions.md.
+function generate_document_slug(): string {
+    $alphabet = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+    $len = strlen($alphabet);
+    $out = 'doc_';
+    for ($i = 0; $i < 10; $i++) {
+        $out .= $alphabet[random_int(0, $len - 1)];
+    }
+    return $out;
+}
+
 function h(string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 }

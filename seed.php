@@ -10,8 +10,6 @@ if (file_exists($dbPath)) {
 
 $pdo = db();
 
-// schema.sql is the frozen initial state. All subsequent schema
-// changes ship as numbered migrations applied on top.
 $pdo->exec(file_get_contents(__DIR__ . '/schema.sql'));
 echo "Applied schema.sql\n";
 
@@ -23,13 +21,15 @@ $pdo->exec("
         ('freddy@folio.example', 'Freddy Folio')
 ");
 
+$slug = generate_document_slug();
 $stmt = $pdo->prepare('
-    INSERT INTO documents (title, body, created_by)
-    VALUES (?, ?, 1)
+    INSERT INTO documents (title, body, created_by, slug)
+    VALUES (?, ?, 1, ?)
 ');
 $stmt->execute([
     'Welcome Packet',
     "Welcome to Folio!\n\nThis is the body of your welcome packet.",
+    $slug,
 ]);
 $docId = (int) $pdo->lastInsertId();
 
