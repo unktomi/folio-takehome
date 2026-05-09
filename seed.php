@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__ . '/lib/bootstrap.php';
+require __DIR__ . '/lib/migrate.php';
 
 $dbPath = __DIR__ . '/db.sqlite';
 if (file_exists($dbPath)) {
@@ -8,7 +9,14 @@ if (file_exists($dbPath)) {
 }
 
 $pdo = db();
+
+// schema.sql is the frozen initial state. All subsequent schema
+// changes ship as numbered migrations applied on top.
 $pdo->exec(file_get_contents(__DIR__ . '/schema.sql'));
+echo "Applied schema.sql\n";
+
+echo "Running migrations:\n";
+run_migrations();
 
 $pdo->exec("
     INSERT INTO staff (email, name) VALUES
