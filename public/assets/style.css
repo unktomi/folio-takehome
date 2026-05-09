@@ -359,6 +359,30 @@ table.data td.id {
     border: 0;
 }
 
+.search-clear {
+    font-size: 0.85rem;
+}
+
+.search-clear[hidden] {
+    display: none;
+}
+
+.search-status {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    min-height: 1.2em;
+    margin: 0 0 0.75rem;
+}
+
+.search-status:empty {
+    margin: 0;
+}
+
+.result-count {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+}
+
 .centered-message {
     max-width: 460px;
     margin: 5rem auto;
