@@ -188,6 +188,18 @@ a:hover { color: var(--accent-hover); }
     color: white;
 }
 
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border-strong);
+}
+
+.btn-secondary:hover {
+    background: var(--bg);
+    color: var(--text);
+    border-color: var(--border-strong);
+}
+
 .btn-link {
     background: none;
     border: none;
@@ -309,6 +321,42 @@ table.data td.id {
     padding: 1.5rem;
     font-style: italic;
     font-size: 0.92rem;
+}
+
+.search-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.search-form input[type=search] {
+    flex: 1;
+    padding: 0.55rem 0.75rem;
+    font: inherit;
+    font-size: 0.95rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-form input[type=search]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .centered-message {

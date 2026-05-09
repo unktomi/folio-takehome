@@ -29,11 +29,6 @@ function assert_true($cond, string $msg = ''): void {
     }
 }
 
-// Render a public/*.php page in a subprocess and capture stdout.
-// Subprocess isolation is needed because pages call `exit` after a
-// POST redirect; inlining them would kill the test runner. Both
-// processes share db.sqlite, so state written by the subprocess is
-// visible to the parent on the next query.
 function render_page(string $script, array $get = [], array $post = [], string $method = 'GET'): string {
     $env = [
         'TEST_SCRIPT' => $script,
@@ -65,7 +60,6 @@ function render_page(string $script, array $get = [], array $post = [], string $
     return $stdout;
 }
 
-// Insert a document directly for test setup. Returns [id, slug].
 function make_doc(string $title, string $body = 'body'): array {
     $slug = generate_document_slug();
     $stmt = db()->prepare('
@@ -144,6 +138,73 @@ test('slug is recorded in the audit log on document creation', function () {
     $details = json_decode($row['details'], true);
     assert_true(isset($details['slug']), 'audit details should include slug');
     assert_true(preg_match('/^doc_/', $details['slug']) === 1, 'slug format in audit log');
+});
+
+// --- Search ---
+
+test('search finds a document by full title', function () {
+    make_doc('Onboarding Packet');
+    $html = render_page('admin.php', ['q' => 'Onboarding Packet']);
+    assert_true(str_contains($html, 'Onboarding Packet'), 'exact match should appear');
+});
+
+test('search matches a prefix of a single token', function () {
+    make_doc('Quarterly Review 2026');
+    $html = render_page('admin.php', ['q' => 'quart']);
+    assert_true(str_contains($html, 'Quarterly Review 2026'), 'prefix match should appear');
+});
+
+test('search matches multiple tokens with AND semantics', function () {
+    make_doc('Acme Renewal Contract');
+    make_doc('Acme Kickoff Notes');
+    $html = render_page('admin.php', ['q' => 'acme renewal']);
+    assert_true(str_contains($html, 'Acme Renewal Contract'), 'both-token match should appear');
+    assert_true(!str_contains($html, 'Acme Kickoff Notes'), 'partial-token match should NOT appear');
+});
+
+test('search is case-insensitive', function () {
+    make_doc('Vendor Security Review');
+    $html = render_page('admin.php', ['q' => 'VENDOR security']);
+    assert_true(str_contains($html, 'Vendor Security Review'), 'case-insensitive match should appear');
+});
+
+test('search with no matches shows an empty-state message', function () {
+    $html = render_page('admin.php', ['q' => 'zzznevermatchzzz']);
+    assert_true(str_contains($html, 'No documents match'), 'empty-state should render');
+});
+
+test('empty search query shows the full list', function () {
+    make_doc('Listed Doc A');
+    make_doc('Listed Doc B');
+    $html = render_page('admin.php', ['q' => '']);
+    assert_true(str_contains($html, 'Listed Doc A'), 'should show all docs');
+    assert_true(str_contains($html, 'Listed Doc B'), 'should show all docs');
+});
+
+test('search survives hostile FTS5 input without crashing', function () {
+    make_doc('Safe Title');
+    $hostile = ['"safe" OR NEAR(', '* * *', 'AND NOT ^col:', '()()()'];
+    foreach ($hostile as $q) {
+        $html = render_page('admin.php', ['q' => $q]);
+        assert_true(str_contains($html, '<table') || str_contains($html, 'No documents match'),
+            "hostile query {$q} should render a normal page");
+    }
+});
+
+test('search finds a doc via a quote-containing user query', function () {
+    make_doc('Safe Title');
+    $html = render_page('admin.php', ['q' => '"safe"']);
+    assert_true(str_contains($html, 'Safe Title'), 'should find "Safe Title" via "safe" input');
+});
+
+test('build_fts_query handles edge cases', function () {
+    assert_true(build_fts_query('') === null, 'empty input -> null');
+    assert_true(build_fts_query('   ') === null, 'whitespace-only -> null');
+    assert_true(build_fts_query('!!!') === null, 'punctuation-only -> null');
+    assert_true(build_fts_query('hello') === '"hello"*', 'single token quoted + *');
+    assert_true(build_fts_query('foo bar') === '"foo"* "bar"*', 'multi token quoted + *');
+    assert_true(build_fts_query('FOO "bar"') === '"FOO"* "bar"*', 'strips quotes from input');
+    assert_true(build_fts_query('OR NEAR') === '"OR"* "NEAR"*', 'reserved words quoted');
 });
 
 echo "\n{$pass} passed, {$fail} failed.\n";

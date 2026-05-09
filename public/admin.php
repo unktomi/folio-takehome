@@ -21,8 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$title, $body, $staff['id'], $slug]);
         $docId = (int) db()->lastInsertId();
 
-        // Slug is recorded in the audit log as a stable internal handle.
-        // It is NOT surfaced in the UI or URLs — see docs/decisions.md.
         audit_log('create', 'document', $docId, [
             'title' => $title,
             'slug' => $slug,
@@ -33,12 +31,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$docs = db()->query('
-    SELECT d.*, s.name AS creator_name
-    FROM documents d
-    JOIN staff s ON s.id = d.created_by
-    ORDER BY d.created_at DESC
-')->fetchAll();
+// Search: ?q= runs an FTS5 MATCH against titles. Empty -> full list.
+$q = trim((string) ($_GET['q'] ?? ''));
+$ftsQuery = $q !== '' ? build_fts_query($q) : null;
+
+if ($ftsQuery !== null) {
+    // Join FTS virtual table -> documents -> staff. bm25 rank first
+    // (lower = better match), recency as tiebreaker.
+    $stmt = db()->prepare('
+        SELECT d.*, s.name AS creator_name
+        FROM documents_fts f
+        JOIN documents d ON d.id = f.rowid
+        JOIN staff s ON s.id = d.created_by
+        WHERE documents_fts MATCH :q
+        ORDER BY bm25(documents_fts), d.created_at DESC
+    ');
+    $stmt->execute([':q' => $ftsQuery]);
+    $docs = $stmt->fetchAll();
+} else {
+    $docs = db()->query('
+        SELECT d.*, s.name AS creator_name
+        FROM documents d
+        JOIN staff s ON s.id = d.created_by
+        ORDER BY d.created_at DESC
+    ')->fetchAll();
+}
 
 render_header('Admin', $staff);
 ?>
@@ -71,9 +88,30 @@ render_header('Admin', $staff);
 
 <section class="card">
     <h2 class="card-title">Documents</h2>
-    <?php if (empty($docs)): ?>
+    <form method="get" class="search-form" role="search">
+        <label for="q" class="sr-only">Search documents by title</label>
+        <input
+            type="search"
+            id="q"
+            name="q"
+            value="<?= h($q) ?>"
+            placeholder="Search by title…"
+            autocomplete="off"
+        >
+        <button type="submit" class="btn btn-secondary">Search</button>
+        <?php if ($q !== ''): ?>
+            <a href="/admin.php" class="btn-link">Clear</a>
+        <?php endif ?>
+    </form>
+
+    <?php if ($q !== '' && empty($docs)): ?>
+        <p class="empty">No documents match “<?= h($q) ?>”.</p>
+    <?php elseif (empty($docs)): ?>
         <p class="empty">No documents yet.</p>
     <?php else: ?>
+        <?php if ($q !== ''): ?>
+            <p class="meta"><?= count($docs) ?> result<?= count($docs) === 1 ? '' : 's' ?> for “<?= h($q) ?>”.</p>
+        <?php endif ?>
         <table class="data">
             <thead>
                 <tr>

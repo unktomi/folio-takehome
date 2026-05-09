@@ -57,6 +57,35 @@ function generate_document_slug(): string {
     return $out;
 }
 
+// Build an FTS5 MATCH expression from raw user input.
+//
+// Strategy:
+//   1. Strip anything that isn't a letter, digit, or whitespace. This
+//      removes FTS5 operator characters (", *, :, (), ^, etc.)
+//      unicode-safely.
+//   2. Split on whitespace.
+//   3. Wrap each token in double quotes and append `*`. The quotes
+//      force FTS5 to treat the token as a literal — otherwise bare
+//      words like OR/AND/NOT/NEAR are parsed as operators and the
+//      query blows up. The `*` enables prefix matching.
+//   4. Join with spaces (implicit AND).
+//
+// Examples:
+//   "welcome"      -> "\"welcome\"*"
+//   "welc pack"    -> "\"welc\"* \"pack\"*"
+//   "OR NEAR"      -> "\"OR\"* \"NEAR\"*"   (not operator-parsed)
+//
+// Returns null if the input has no usable tokens (caller should fall
+// back to "show everything" rather than an empty search).
+function build_fts_query(string $raw): ?string {
+    $clean = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $raw);
+    $tokens = preg_split('/\s+/', trim($clean), -1, PREG_SPLIT_NO_EMPTY);
+    if (!$tokens) {
+        return null;
+    }
+    return implode(' ', array_map(static fn($t) => '"' . $t . '"*', $tokens));
+}
+
 function h(string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 }
